@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>せんべい回復 勉強集中タイマー</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Japanese Wafuu typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wafuu: {
+                            bg: '#fcf8f2',
+                            card: '#f5ebd9',
+                            dark: '#4a3b32',
+                            primary: '#c85a17', // 醤油ブラウン
+                            accent: '#d97706',  // 黄金色
+                            green: '#2d5a27',   // 海苔グリーン
+                            red: '#991b1b',     // 朱色
+                            crust: '#b45309'
+                        }
+                    },
+                    fontFamily: {
+                        kiwi: ['"Kiwi Maru"', 'serif'],
+                        rounded: ['"M PLUS Rounded 1c"', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #fcf8f2;
+            background-image: radial-gradient(#e5d8c5 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* 焼き網背景 */
+        .grill-mesh {
+            background-image: repeating-linear-gradient(0deg, rgba(74,59,50,0.18), rgba(74,59,50,0.18) 2px, transparent 2px, transparent 16px),
+                              repeating-linear-gradient(90deg, rgba(74,59,50,0.18), rgba(74,59,50,0.18) 2px, transparent 2px, transparent 16px);
+        }
+
+        /* アニメーション */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-6px) rotate(1deg); }
+        }
+
+        @keyframes crunchEffect {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.92); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+            70% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        @keyframes rotateRays {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .animate-float {
+            animation: floatSlow 4s ease-in-out infinite;
+        }
+
+        .crunch-active {
+            animation: crunchEffect 0.15s ease-in-out;
+        }
+
+        .animate-pop-in {
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .rotate-rays {
+            animation: rotateRays 12s linear infinite;
+        }
+
+        /* 超リアルな結晶ザラメ粒子 */
+        .zarame-particle {
+            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.35), 1.5px 1.5px 3px rgba(255,255,255,0.95), 0 2px 4px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,240,240,0.8) 100%);
+            border: 0.5px solid rgba(255,255,255,0.8);
+        }
+
+        /* 破片＆紙吹雪エフェクトキャンバス */
+        #particleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        #confettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 60;
+        }
+    </style>
+</head>
+<body class="text-wafuu-dark min-h-screen flex flex-col justify-between selection:bg-wafuu-primary selection:text-white relative">
+
+    <!-- 紙吹雪用全画面キャンバス -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <!-- ヘッダー -->
+    <header class="w-full bg-wafuu-card/90 backdrop-blur border-b-2 border-wafuu-primary/20 px-4 py-3 sticky top-0 z-20 shadow-sm">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-wafuu-primary flex items-center justify-center text-white shadow-md text-xl font-bold font-kiwi">
+                    煎
+                </div>
+                <div>
+                    <h1 class="font-kiwi text-lg sm:text-xl font-bold text-wafuu-dark flex items-center gap-2">
+                        せんべい回復タイマー
+                        <span class="text-xs bg-wafuu-primary/10 text-wafuu-primary px-2 py-0.5 rounded-full border border-wafuu-primary/30">勉強・集中</span>
+                    </h1>
+                    <p class="text-xs text-stone-500 hidden sm:block">集中してせんべいを焼き、バリッと食べてパワー回復！</p>
+                </div>
+            </div>
+
+            <!-- ステータス概要 & モーダルボタン -->
+            <div class="flex items-center gap-2 sm:gap-4">
+                <div class="bg-white/80 px-3 py-1.5 rounded-2xl border border-amber-200 flex items-center gap-2 text-xs sm:text-sm font-bold shadow-sm">
+                    <i class="fa-solid font-bold text-amber-600 fa-cookie"></i>
+                    <span id="headerSenbeiCount">0</span> 枚
+                </div>
+                <button id="btnOpenCollection" class="p-2 sm:px-3 sm:py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl transition flex items-center gap-1.5 text-xs sm:text-sm font-medium border border-amber-300">
+                    <i class="fa-solid fa-book-open text-wafuu-primary"></i>
+                    <span class="hidden sm:inline">図鑑</span>
+                </button>
+                <button id="btnOpenSettings" class="p-2 sm:px-3 sm:py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-xl transition flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+                    <i class="fa-solid fa-gear"></i>
+                    <span class="hidden sm:inline">設定</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col items-center justify-center gap-6">
+
+        <!-- モード切替タブ & 集中度エネルギーバー -->
+        <div class="w-full max-w-md bg-white rounded-2xl p-2 shadow-sm border border-stone-200 flex flex-col gap-3">
+            <div class="flex rounded-xl bg-stone-100 p-1 font-bold text-sm">
+                <button id="tabWork" class="flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 bg-wafuu-primary text-white shadow-sm">
+                    <i class="fa-solid fa-fire"></i> 集中モード (焼成)
+                </button>
+                <button id="tabRest" class="flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 text-stone-500 hover:text-stone-800">
+                    <i class="fa-solid fa-utensils"></i> 回復モード (バリバリ)
+                </button>
+            </div>
+
+            <!-- エネルギー（元気）メーター -->
+            <div class="px-2">
+                <div class="flex justify-between text-xs font-bold text-stone-600 mb-1">
+                    <span><i class="fa-solid fa-bolt text-amber-500"></i> 集中力エネルギー</span>
+                    <span id="energyText">70%</span>
+                </div>
+                <div class="w-full bg-stone-100 h-3 rounded-full overflow-hidden p-0.5 border border-stone-200">
+                    <div id="energyBar" class="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all duration-500" style="width: 70%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- メイン煎餅焼成 / 回復ディスプレイ -->
+        <div class="relative w-full max-w-md bg-wafuu-card/60 rounded-3xl p-6 border-2 border-amber-900/10 shadow-lg flex flex-col items-center justify-center gap-4 overflow-hidden min-h-[380px]">
+            <!-- 破片パーティクル用キャンバス -->
+            <canvas id="particleCanvas" width="400" height="380"></canvas>
+
+            <!-- 網の背景効果 -->
+            <div class="absolute inset-4 rounded-2xl grill-mesh border border-amber-900/20 opacity-70 pointer-events-none"></div>
+
+            <!-- モード案内バッジ -->
+            <div class="z-10 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold border border-stone-200 text-stone-700 shadow-sm flex items-center gap-2">
+                <span id="statusBadgeDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span id="statusText">じっくり集中してせんべいを焼こう</span>
+            </div>
+
+            <!-- せんべい本体ビジュアル（リアルな手焼き風表現） -->
+            <div id="senbeiContainer" class="relative z-10 my-2 cursor-pointer transition-transform duration-200 active:scale-95 group" title="クリックでインタラクション">
+                
+                <!-- 南部せんべい専用のみみ（Outer Ring） -->
+                <div id="nambuRim" class="hidden absolute -inset-4 rounded-full bg-amber-200/90 border-4 border-amber-600 shadow-lg pointer-events-none"></div>
+
+                <div id="senbeiVisual" class="w-48 h-48 sm:w-56 sm:h-56 rounded-full relative flex items-center justify-center transition-all duration-700 animate-float overflow-hidden"
+                     style="background: radial-gradient(circle, #fffbeb 0%, #f59e0b 55%, #78350f 100%); border: 8px solid #a16207; box-shadow: inset 0 4px 14px rgba(255,255,255,0.7), inset 0 -8px 20px rgba(0,0,0,0.5), 0 16px 30px -5px rgba(69, 26, 3, 0.4);">
+                    
+                    <!-- 手焼き焦げ目・泡のぷくぷく質感 -->
+                    <div id="senbeiTexture" class="absolute inset-0 opacity-40 pointer-events-none" 
+                         style="background-image: radial-gradient(#451a03 20%, transparent 21%), radial-gradient(#78350f 15%, transparent 16%); background-size: 28px 28px; background-position: 0 0, 14px 14px;"></div>
+
+                    <!-- 焦げ目進捗オーバーレイ -->
+                    <div id="browningOverlay" class="absolute inset-0 rounded-full opacity-0 transition-opacity duration-1000 pointer-events-none"
+                         style="background: radial-gradient(circle, rgba(120, 53, 15, 0.35) 0%, rgba(43, 16, 2, 0.9) 90%);"></div>
+
+                    <!-- トッピングパーツ群 (リアルグラフィック) -->
+                    <div id="senbeiTopping" class="absolute inset-0 flex items-center justify-center transition-all duration-500 pointer-events-none">
+                        
+                        <!-- 1. 海苔 (Nori): パリッと巻かれた有明海苔 -->
+                        <div id="toppingNori" class="hidden w-24 h-36 bg-stone-950 rounded-sm shadow-2xl border-t-2 border-stone-800 transform -rotate-3 opacity-95 flex flex-col justify-between p-2">
+                            <div class="w-full h-1 bg-stone-800/80 rounded"></div>
+                            <div class="w-full h-1 bg-stone-800/80 rounded"></div>
+                        </div>
+
+                        <!-- 2. ざらめ (Zarame): 粒立った大きな白砂糖結晶 -->
+                        <div id="toppingZarame" class="hidden absolute inset-2 pointer-events-none">
+                            <div class="w-full h-full relative">
+                                <div class="zarame-particle absolute top-4 left-10 w-4.5 h-4.5 rotate-12 rounded-sm"></div>
+                                <div class="zarame-particle absolute top-12 right-8 w-4 h-4 -rotate-45 rounded-sm"></div>
+                                <div class="zarame-particle absolute bottom-10 left-8 w-5 h-5 rotate-45 rounded-sm"></div>
+                                <div class="zarame-particle absolute bottom-8 right-12 w-4 h-4 rotate-12 rounded-sm"></div>
+                                <div class="zarame-particle absolute top-20 left-16 w-4.5 h-4.5 rotate-30 rounded-sm"></div>
+                                <div class="zarame-particle absolute bottom-20 right-16 w-4 h-4 -rotate-12 rounded-sm"></div>
+                            </div>
+                        </div>
+
+                        <!-- 3. 七味唐辛子 (Chili): 唐辛子とゴマの赤黒粒つぶ -->
+                        <div id="toppingChili" class="hidden absolute inset-0 rounded-full"
+                             style="background-image: radial-gradient(#b91c1c 30%, transparent 31%), radial-gradient(#0c0a09 25%, transparent 26%); background-size: 16px 16px; background-position: 0 0, 8px 8px;"></div>
+
+                        <!-- 4. 黒ごま (Goma): びっしり黒ゴマ -->
+                        <div id="toppingGoma" class="hidden absolute inset-2 rounded-full opacity-90"
+                             style="background-image: radial-gradient(#0c0a09 40%, transparent 41%); background-size: 18px 18px; background-position: 0 0, 9px 9px;"></div>
+
+                        <!-- 5. 抹茶 (Matcha): 高級感ある濃緑の和蜜 -->
+                        <div id="toppingMatcha" class="hidden absolute inset-3 rounded-full bg-emerald-900/70 backdrop-blur-[0.5px] border-4 border-emerald-800/80 shadow-inner flex items-center justify-center">
+                            <div class="w-20 h-20 border-2 border-emerald-400/30 rounded-full"></div>
+                        </div>
+
+                        <!-- 6. チーズ (Cheese): 厚切り溶けたチェダーチーズ -->
+                        <div id="toppingCheese" class="hidden w-28 h-28 bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-500 rounded-2xl transform rotate-12 shadow-2xl border-2 border-amber-200 opacity-95 relative overflow-hidden">
+                            <div class="absolute -bottom-2 -left-2 w-12 h-12 bg-amber-600/30 rounded-full"></div>
+                        </div>
+
+                        <!-- 7. たこ焼き風 (Takoyaki): 青のり＆紅生姜＆ソース -->
+                        <div id="toppingTakoyaki" class="hidden absolute inset-0 rounded-full"
+                             style="background-image: radial-gradient(#15803d 28%, transparent 29%), radial-gradient(#b91c1c 22%, transparent 23%); background-size: 18px 18px; background-position: 0 0, 9px 9px;">
+                            <div class="absolute inset-5 rounded-full bg-amber-950/60 border-4 border-amber-900/70 shadow-2xl"></div>
+                        </div>
+
+                        <!-- 8. えび満月 (Ebi): 海老モチーフのシルエット -->
+                        <div id="toppingEbi" class="hidden absolute inset-0 flex items-center justify-center">
+                            <i class="fa-solid fa-shrimp text-rose-600/80 text-6xl transform -rotate-45 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"></i>
+                        </div>
+
+                        <!-- 9. ぽたぽたタレ (Potapota): 醤油ダレのツヤ -->
+                        <div id="toppingPotapota" class="hidden absolute inset-3 rounded-full bg-amber-950/50 border-8 border-amber-800/70 shadow-inner flex items-center justify-center">
+                            <div class="w-20 h-20 rounded-full border-4 border-amber-700/50"></div>
+                        </div>
+
+                        <!-- 10. 南部ピーナッツ (Nambu): 大きな落花生（ピーナッツ） -->
+                        <div id="toppingNambu" class="hidden absolute inset-0 rounded-full">
+                            <div class="absolute top-6 left-10 w-7 h-4.5 bg-[#78350f] rounded-full border border-[#451a03] transform rotate-12 shadow-md"></div>
+                            <div class="absolute top-12 right-8 w-7 h-4.5 bg-[#78350f] rounded-full border border-[#451a03] transform -rotate-45 shadow-md"></div>
+                            <div class="absolute bottom-8 left-12 w-7 h-4.5 bg-[#78350f] rounded-full border border-[#451a03] transform rotate-45 shadow-md"></div>
+                            <div class="absolute bottom-10 right-10 w-7 h-4.5 bg-[#78350f] rounded-full border border-[#451a03] transform -rotate-12 shadow-md"></div>
+                        </div>
+
+                        <!-- 11. 瓦せんべい刻印 (Kawara): 「瓦」文字の刻印 -->
+                        <div id="toppingKawara" class="hidden absolute inset-0 flex items-center justify-center">
+                            <div class="w-28 h-28 border-4 border-amber-950/50 rounded-2xl flex items-center justify-center text-amber-950/60 font-kiwi font-bold text-3xl tracking-widest shadow-inner">
+                                瓦
+                            </div>
+                        </div>
+
+                        <!-- 12. 金箔 (Gold): 輝く金箔シート -->
+                        <div id="toppingGold" class="hidden absolute inset-0 flex items-center justify-center">
+                            <div class="w-24 h-24 bg-gradient-to-tr from-yellow-200 via-amber-300 to-yellow-500 rounded-tl-3xl rounded-br-2xl transform -rotate-12 opacity-95 border-2 border-white/90 shadow-2xl"></div>
+                        </div>
+
+                        <!-- 13. ストループワッフル (Stroop): 格子柄ワッフル -->
+                        <div id="toppingStroop" class="hidden absolute inset-0 rounded-full opacity-60"
+                             style="background-image: repeating-linear-gradient(45deg, #451a03 0, #451a03 3px, transparent 0, transparent 14px), repeating-linear-gradient(-45deg, #451a03 0, #451a03 3px, transparent 0, transparent 14px);"></div>
+
+                        <!-- 14. 八ツ橋 (Yatsuhashi): 八ツ橋の刻印 -->
+                        <div id="toppingYatsuhashi" class="hidden absolute inset-0 flex items-center justify-center">
+                            <div class="w-24 h-28 border-2 border-amber-950/40 rounded-full opacity-60 flex items-center justify-center">
+                                <span class="font-kiwi text-amber-950 font-bold text-sm">八ツ橋</span>
+                            </div>
+                        </div>
+
+                        <!-- 15. 磯べ餅 (Isobe): 海苔巻き餅 -->
+                        <div id="toppingIsobe" class="hidden w-28 h-36 bg-stone-900 rounded-lg shadow-2xl border-t-2 border-stone-700 transform rotate-6 opacity-90 flex items-center justify-center">
+                            <div class="w-20 h-20 bg-amber-100/30 rounded-full blur-[1px]"></div>
+                        </div>
+
+                        <!-- 16. タコスチップス (Tacos): クリスピーなカット -->
+                        <div id="toppingTacos" class="hidden absolute inset-0 flex items-center justify-center">
+                            <div class="w-20 h-20 bg-gradient-to-tr from-amber-600 to-amber-400 rounded-tl-full opacity-85 border-2 border-amber-700 shadow-inner"></div>
+                        </div>
+                    </div>
+
+                    <!-- 手焼き焦げ目＆ナチュラルひび模様 -->
+                    <svg id="crackPattern" class="absolute inset-0 w-full h-full opacity-30 pointer-events-none" viewBox="0 0 100 100">
+                        <path d="M 20 35 Q 40 25 65 30" stroke="#451a03" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        <path d="M 30 70 Q 55 75 75 65" stroke="#451a03" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                        <circle cx="28" cy="40" r="3" fill="#451a03" opacity="0.4"/>
+                        <circle cx="72" cy="58" r="3.5" fill="#451a03" opacity="0.4"/>
+                    </svg>
+
+                    <!-- タップ誘導ヒント（回復モード時） -->
+                    <div id="eatPrompt" class="hidden absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center text-white font-bold text-sm backdrop-blur-[1px] animate-pulse">
+                        <i class="fa-solid fa-hand-pointer text-2xl mb-1"></i>
+                        タップして食べる！
+                    </div>
+                </div>
+            </div>
+
+            <!-- 焼き加減進捗インジケーター -->
+            <div id="browningStageText" class="z-10 font-kiwi font-bold text-stone-700 text-sm flex items-center gap-2">
+                <span>焼き加減:</span>
+                <span id="stageLabel" class="text-wafuu-primary">生の生地</span>
+            </div>
+
+            <!-- タイマーカウントダウン表示 -->
+            <div class="z-10 text-center">
+                <div id="timerDisplay" class="font-mono text-5xl sm:text-6xl font-black tracking-tight text-wafuu-dark drop-shadow-sm">
+                    25:00
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作ボタン群 -->
+        <div class="w-full max-w-md flex flex-col gap-3">
+            <div class="flex items-center gap-3">
+                <button id="btnStartPause" class="flex-1 py-3.5 px-6 bg-wafuu-primary hover:bg-amber-800 active:scale-98 text-white rounded-2xl font-bold text-lg shadow-md transition flex items-center justify-center gap-2">
+                    <i id="btnStartIcon" class="fa-solid fa-play"></i>
+                    <span id="btnStartText">焼き始める (集中開始)</span>
+                </button>
+                <button id="btnReset" class="p-3.5 bg-white hover:bg-stone-100 text-stone-600 rounded-2xl font-bold border border-stone-300 shadow-sm transition active:scale-95" title="タイマーリセット">
+                    <i class="fa-solid fa-rotate-left text-lg"></i>
+                </button>
+            </div>
+
+            <!-- 効果音 & 環境音切り替え -->
+            <div class="flex items-center justify-between px-2 text-xs font-bold text-stone-600">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="chkSound" checked class="w-4 h-4 text-wafuu-primary rounded focus:ring-amber-500">
+                    <span><i class="fa-solid fa-volume-high text-amber-600"></i> 効果音 (バリバリ音・焼き音)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="chkBgm" class="w-4 h-4 text-wafuu-primary rounded focus:ring-amber-500">
+                    <span><i class="fa-solid fa-music text-amber-600"></i> 作業BGM (和風環境音)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 本日の勉強記録 & 実績 -->
+        <div class="w-full max-w-md bg-white rounded-2xl p-4 shadow-sm border border-stone-200 flex flex-col gap-3">
+            <h3 class="font-kiwi font-bold text-stone-800 text-sm flex items-center justify-between border-b pb-2 border-stone-100">
+                <span><i class="fa-solid fa-chart-line text-wafuu-primary"></i> 本日の焼き上げ戦績</span>
+                <span class="text-xs font-normal text-stone-400" id="currentDateStr">2026/09/03</span>
+            </h3>
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                    <div class="text-xs text-stone-500">集中時間</div>
+                    <div id="statTotalTime" class="font-bold text-lg text-amber-900 mt-0.5">0 分</div>
+                </div>
+                <div class="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                    <div class="text-xs text-stone-500">完成せんべい</div>
+                    <div id="statSenbeiCount" class="font-bold text-lg text-amber-900 mt-0.5">0 枚</div>
+                </div>
+                <div class="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                    <div class="text-xs text-stone-500">回復パワー</div>
+                    <div id="statRecovered" class="font-bold text-lg text-amber-900 mt-0.5">0 pt</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="w-full text-center py-4 text-xs text-stone-400 border-t border-stone-200 bg-white/50">
+        せんべい回復 勉強集中タイマー &copy; 2026 | パリッと割ってリフレッシュ！
+    </footer>
+
+    <!-- 新お菓子GET! お祝いモーダルポップアップ -->
+    <div id="modalGet" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gradient-to-b from-amber-50 to-amber-100 w-full max-w-sm rounded-3xl p-6 shadow-2xl border-4 border-amber-400 text-center flex flex-col items-center gap-3 relative animate-pop-in overflow-hidden">
+            
+            <!-- 背景の後光（光線）放射エフェクト -->
+            <div class="absolute inset-0 flex items-center justify-center opacity-25 pointer-events-none">
+                <div class="w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(245,158,11,1)_0%,transparent_70%)] rotate-rays"></div>
+            </div>
+
+            <!-- お祝いヘッダー -->
+            <div class="z-10 bg-amber-500 text-white font-kiwi font-bold text-sm px-4 py-1 rounded-full shadow border border-amber-300 animate-bounce">
+                ✨ 新しいお菓子をGET! ✨
+            </div>
+
+            <h3 id="getSenbeiName" class="z-10 font-kiwi font-black text-2xl text-amber-950 mt-1">
+                パリッと海苔巻き煎餅
+            </h3>
+
+            <!-- ゲットしたお菓子のビジュアル表示 -->
+            <div id="getIconContainer" class="z-10 w-32 h-32 rounded-full flex items-center justify-center shadow-2xl relative border-4 border-amber-500 my-2 overflow-hidden bg-white">
+                <!-- JSで動的生成 -->
+            </div>
+
+            <p id="getSenbeiDesc" class="z-10 text-xs text-stone-700 font-medium px-2 leading-relaxed">
+                高級有明海苔を贅沢に巻いた一番人気！
+            </p>
+
+            <button id="btnGetConfirm" class="z-10 w-full py-3 bg-gradient-to-r from-amber-600 to-wafuu-primary hover:from-amber-700 hover:to-amber-800 text-white font-bold rounded-2xl shadow-lg transition active:scale-95 mt-2 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-gift text-yellow-300"></i>
+                図鑑に登録されました！
+            </button>
+        </div>
+    </div>
+
+    <!-- カスタム通知 ＆ ねぎらい・豆知識ポップアップモーダル -->
+    <div id="modalNotice" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-wafuu-bg w-full max-w-md rounded-3xl p-6 shadow-2xl border-2 border-amber-900/20 text-center flex flex-col items-center gap-3 relative">
+            <div id="noticeIcon" class="w-16 h-16 rounded-full bg-amber-100 text-wafuu-primary flex items-center justify-center text-3xl shadow-inner border border-amber-200">
+                <i class="fa-solid fa-cookie-bite"></i>
+            </div>
+            <h3 id="noticeTitle" class="font-kiwi font-bold text-lg text-stone-800">通知タイトル</h3>
+            
+            <p id="noticeMessage" class="text-xs text-stone-600 leading-relaxed">通知メッセージ</p>
+
+            <!-- 焼き上がり時のねぎらい＆豆知識コーナー -->
+            <div id="triviaBox" class="hidden w-full bg-white/80 rounded-2xl p-3.5 border border-amber-200/80 shadow-sm text-left flex flex-col gap-2 my-1">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-wafuu-primary border-b border-amber-100 pb-1.5">
+                    <i class="fa-solid fa-heart text-rose-500"></i>
+                    <span id="praiseTitle">今日もお疲れ様！</span>
+                </div>
+                <p id="praiseText" class="text-xs text-stone-700 font-medium leading-relaxed">素晴らしい集中力でしたね！よく頑張りました！</p>
+                
+                <div class="flex items-center gap-1.5 text-xs font-bold text-amber-800 pt-1 border-t border-amber-100">
+                    <i class="fa-solid fa-lightbulb text-amber-500"></i>
+                    <span>せんべい・お菓子豆知識</span>
+                </div>
+                <p id="triviaText" class="text-[11px] text-stone-600 leading-normal bg-amber-50/50 p-2 rounded-xl border border-amber-100">
+                    草加せんべいは、江戸時代に街道の茶屋で売られていた団子を潰して乾かし、焼き上げたのが始まりと言われています。
+                </p>
+            </div>
+
+            <button id="btnCloseNotice" class="w-full py-2.5 bg-wafuu-primary hover:bg-amber-800 text-white font-bold rounded-xl shadow transition mt-1 active:scale-95">
+                はい！休憩します！
+            </button>
+        </div>
+    </div>
+
+    <!-- せんべい図鑑モーダル -->
+    <div id="modalCollection" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-wafuu-bg w-full max-w-4xl rounded-3xl p-6 shadow-2xl border-2 border-amber-900/20 max-h-[85vh] flex flex-col relative">
+            <div class="flex items-center justify-between border-b border-amber-900/10 pb-3 mb-3">
+                <h2 class="font-kiwi text-xl font-bold text-wafuu-dark flex items-center gap-2">
+                    <i class="fa-solid fa-globe text-wafuu-primary"></i> 世界＆日本のせんべい・お菓子図鑑 (全24種)
+                </h2>
+                <button id="btnCloseCollection" class="w-8 h-8 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- 全解放コントロールボタン -->
+            <div class="mb-3 bg-amber-100/70 border border-amber-200 p-2.5 rounded-2xl flex items-center justify-between gap-2 shadow-sm">
+                <div class="text-xs text-amber-900 font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-600"></i> タップして詳細・豆知識を読もう！
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btnUnlockAll" class="text-xs bg-amber-600 hover:bg-amber-700 active:scale-95 text-white px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 shadow-sm">
+                        <i class="fa-solid fa-key"></i> 全お菓子をテスト解放
+                    </button>
+                    <button id="btnResetCollection" class="text-xs bg-stone-200 hover:bg-stone-300 text-stone-700 px-2.5 py-1.5 rounded-xl font-medium transition" title="図鑑を初期状態に戻す">
+                        リセット
+                    </button>
+                </div>
+            </div>
+
+            <p class="text-xs text-stone-600 mb-3">カードをタップするとピックアップ拡大表示され、歴史や豆知識が読めます！</p>
+
+            <div id="collectionGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-y-auto pr-1 flex-1">
+                <!-- JSで動的生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- お菓子個別ピックアップ詳細モーダル -->
+    <div id="modalDetail" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-wafuu-bg w-full max-w-md rounded-3xl p-6 shadow-2xl border-2 border-amber-900/30 flex flex-col items-center gap-4 relative animate-float">
+            <!-- 閉じるボタン -->
+            <button id="btnCloseDetail" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-600 flex items-center justify-center transition shadow-sm">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- ピックアップアイコン展示 -->
+            <div id="detailIconContainer" class="w-28 h-28 rounded-full flex items-center justify-center shadow-xl relative border-4 border-amber-600/80 my-1 overflow-hidden">
+                <!-- JSで動的にセット -->
+            </div>
+
+            <!-- お菓子基本情報 -->
+            <div class="text-center w-full">
+                <span id="detailBadge" class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">日本</span>
+                <h3 id="detailName" class="font-kiwi text-xl font-bold text-stone-800 mt-1">香ばし醤油せんべい</h3>
+                <p id="detailDesc" class="text-xs text-stone-600 mt-1.5 px-2">定番中の定番。伝統の醤油ダレが香ばしい。</p>
+            </div>
+
+            <!-- 豆知識カード -->
+            <div class="w-full bg-white rounded-2xl p-4 border border-amber-200/90 shadow-sm text-left flex flex-col gap-1.5">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-amber-800 border-b border-amber-100 pb-1.5">
+                    <i class="fa-solid fa-book-bookmark text-amber-600"></i>
+                    <span>このお菓子の豆知識・雑学</span>
+                </div>
+                <p id="detailTrivia" class="text-xs text-stone-700 leading-relaxed font-medium pt-1">
+                    豆知識がここに表示されます。
+                </p>
+            </div>
+
+            <!-- アクションボタン -->
+            <button id="btnSelectSenbei" class="w-full py-3 bg-wafuu-primary hover:bg-amber-800 text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 active:scale-95">
+                <i class="fa-solid fa-fire text-amber-300"></i>
+                このせんべいをセットして焼く！
+            </button>
+        </div>
+    </div>
+
+    <!-- 設定モーダル -->
+    <div id="modalSettings" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-stone-200">
+            <div class="flex items-center justify-between border-b pb-3 mb-4">
+                <h2 class="font-kiwi text-xl font-bold text-stone-800 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-wafuu-primary"></i> タイマー設定
+                </h2>
+                <button id="btnCloseSettings" class="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="settingsForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-stone-700 mb-1">集中時間 (分)</label>
+                    <input type="number" id="inputWorkMin" min="1" max="120" value="25" class="w-full px-4 py-2 rounded-xl border border-stone-300 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-stone-700 mb-1">休憩時間 (分)</label>
+                    <input type="number" id="inputRestMin" min="1" max="60" value="5" class="w-full px-4 py-2 rounded-xl border border-stone-300 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-3 bg-wafuu-primary hover:bg-amber-800 text-white font-bold rounded-xl shadow transition">
+                        設定を保存する
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 豆知識＆ねぎらいメッセージ集
+        // ==========================================
+        const PRAISE_MESSAGES = [
+            "素晴らしい集中力でした！脳もしっかり頑張りましたね！",
+            "最後まで集中をやり遂げました！本当にお見事です！",
+            "着実に学習が進んでいます！少し肩の力を抜いて休憩しましょう。",
+            "香ばしいせんべいが焼き上がりました！自分を褒めてあげてくださいね。",
+            "積み重ねが大きな力になります。ゆっくり深呼吸しましょう！",
+            "集中タイムクリア！パリッと食べてエネルギー全快です！"
+        ];
+
+        const TRIVIA_LIST = [
+            "【醤油せんべい】草加せんべいは、江戸時代に日光街道の茶屋で余った団子を乾かして焼き始めたのがルーツと言われています。",
+            "【海苔巻き】せんべいに海苔を巻くようになったのは明治時代。湿気を防ぎ手も汚れない工夫でした。",
+            "【ざらめ】砂糖の結晶である『ザラメ』は、醤油の塩気とあわさることで甘じょっぱい絶妙な味わいを生み出します。",
+            "【南部せんべい】岩手県や青森県の伝統菓子。昔は合戦中の非常食としても重宝されていたそうです。",
+            "【瓦せんべい】神戸の名物。職人が一枚ずつ瓦の型で焼き上げ、カステラに似た優しい甘さが特徴です。",
+            "【フォーチュンクッキー】中にメッセージが入ったクッキー。実は日本の神社にあった『辻占煎餅（つじうらせんべい）』がルーツと言われます。",
+            "【ストループワッフル】オランダ発祥。温かい紅茶やコーヒーのカップの上に載せて、カラメルをトロッと溶かして食べるのが本場流！",
+            "【八ツ橋】お琴の形を模して作られた京都の伝統和菓子。焼き八ツ橋のパリッとした心地よい歯ごたえが特徴です。",
+            "【あられとおかき】実は原料の大きさで名前が変わります！小さめのものが『あられ』、大きめのものが『おかき』と呼ばれます。",
+            "【咀嚼（そしゃく）の効果】せんべいのような噛みごたえのある食べ物を噛むと、脳の血流が良くなり集中力や記憶力がアップします！"
+        ];
+
+        // ==========================================
+        // 状態管理 & 日本・世界のお菓子全24種（全種トリビア付き）
+        // ==========================================
+        const SENBEI_TYPES = [
+            // 日本の伝統せんべい
+            { id: 'shoyu', name: '香ばし醤油せんべい', desc: '【日本】定番中の定番。伝統の醤油ダレが香ばしい。', trivia: '江戸時代の日光街道の茶屋で売られていた団子を潰して焼いた『草加せんべい』が全国に広まった歴史があります。', unlockCondition: { type: 'default', text: '最初から解放' }, color: '#c85a17', bgGrad: 'radial-gradient(circle, #fef3c7 0%, #f59e0b 60%, #b45309 100%)', border: '#a16207', shape: 'round', topping: null },
+            { id: 'nori', name: 'パリッと海苔巻き煎餅', desc: '【日本】高級有明海苔を贅沢に巻いた一番人気。', trivia: '明治時代に持ちやすく手が汚れない工夫として海苔が巻かれ始めました。磯の香りと醤油の相性が抜群です。', unlockCondition: { type: 'count', target: 3, text: '累計3枚焼き上げ' }, color: '#2d5a27', bgGrad: 'radial-gradient(circle, #fef3c7 0%, #d97706 60%, #92400e 100%)', border: '#78350f', shape: 'round', topping: 'nori' },
+            { id: 'zarame', name: '甘辛ざらめ煎餅', desc: '【日本】ザクザクした大きな砂糖の結晶が癖になる。', trivia: '粗い白砂糖結晶『ザラメ』の甘さと、下地の醤油のしょっぱさが引き立て合う和の甘辛バランスの傑作です。', unlockCondition: { type: 'count', target: 5, text: '累計5枚焼き上げ' }, color: '#d97706', bgGrad: 'radial-gradient(circle, #fffbeb 0%, #f59e0b 60%, #b45309 100%)', border: '#92400e', shape: 'round', topping: 'zarame' },
+            { id: 'chili', name: 'ピリ辛七味煎餅', desc: '【日本】七味唐辛子がぴりりと効いた和風大人味。', trivia: '江戸の薬研堀（やげんぼり）発祥の七味唐辛子を使用。唐辛子・麻の実・陳皮などが交ざる香ばしい刺激が目覚ましにぴったり！', unlockCondition: { type: 'recover', target: 50, text: '累計50pt回復' }, color: '#991b1b', bgGrad: 'radial-gradient(circle, #fef2f2 0%, #f87171 50%, #991b1b 100%)', border: '#7f1d1d', shape: 'round', topping: 'chili' },
+            { id: 'goma', name: '黒ごま香ばし煎餅', desc: '【日本】たっぷり練り込まれた黒ゴマの豊かな風味。', trivia: '黒ゴマはセサミンやカルシウムが豊富！生地にびっしり練り込んで焼き上げることでプチプチした食感が楽しめます。', unlockCondition: { type: 'count', target: 10, text: '累計10枚焼き上げ' }, color: '#292524', bgGrad: 'radial-gradient(circle, #fafaf9 0%, #a8a29e 60%, #44403c 100%)', border: '#292524', shape: 'round', topping: 'goma' },
+            { id: 'matcha', name: '抹茶砂糖煎餅', desc: '【日本】ほろ苦い抹茶の蜜と砂糖の和スイーツ。', trivia: '京都宇治の高品質な抹茶蜜を使用。ほろ苦い抹茶と甘いお砂糖のコーティングが上品なお茶請け（お茶菓子）です。', unlockCondition: { type: 'time', target: 60, text: '累計60分集中' }, color: '#15803d', bgGrad: 'radial-gradient(circle, #f0fdf4 0%, #4ade80 50%, #15803d 100%)', border: '#14532d', shape: 'round', topping: 'matcha' },
+            { id: 'ebi', name: 'えび満月煎餅', desc: '【日本】ほんのりピンク色のえび風味煎餅。', trivia: '丸くて満月のような形とえびのピンク色から『えび満月』と名付けられました。さくさく軽い歯ごたえが特徴です。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#f43f5e', bgGrad: 'radial-gradient(circle, #fff1f2 0%, #fda4af 60%, #e11d48 100%)', border: '#be123c', shape: 'round', topping: 'ebi' },
+            { id: 'cheese', name: 'cheese醤油煎餅', desc: '【日本】醤油煎餅に濃厚チェダーチーズ。', trivia: '香ばしい和の醤油煎餅に濃厚な洋のチーズをトッピングした、昭和・平成で大ヒットした和洋折衷の人気スナックです。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#f59e0b', bgGrad: 'radial-gradient(circle, #fefce8 0%, #fde047 60%, #d97706 100%)', border: '#b45309', shape: 'round', topping: 'cheese' },
+            { id: 'takoyaki', name: 'たこ焼き風煎餅', desc: '【日本】青のりと紅生姜の大阪ソウルフード風。', trivia: '大阪の屋台の味を煎餅で再現！青のり・紅生姜・濃厚ソースが効いていて、一口食べると屋台気分が味わえます。', unlockCondition: { type: 'recover', target: 100, text: '累計100pt回復' }, color: '#166534', bgGrad: 'radial-gradient(circle, #fefce8 0%, #f59e0b 60%, #78350f 100%)', border: '#451a03', shape: 'round', topping: 'takoyaki' },
+            { id: 'potapota', name: 'ぽたぽた甘醤油せん', desc: '【日本】甘じょっぱい醤油ダレがたっぷり。', trivia: 'おばあちゃんのキャラクターでおなじみ。砂糖と醤油をぽたぽたとたらしたようなやさしい甘さのロングセラーおせんべいです。', unlockCondition: { type: 'count', target: 15, text: '累計15枚焼き上げ' }, color: '#78350f', bgGrad: 'radial-gradient(circle, #fffbeb 0%, #fcd34d 50%, #b45309 100%)', border: '#78350f', shape: 'round', topping: 'potapota' },
+
+            // 日本の類似伝統菓子
+            { id: 'nambu', name: '南部せんべい', desc: '【日本・岩手】小麦とピーナッツの素朴な香ばしさ。', trivia: '米ではなく小麦粉を主原料とする北東北の伝統せんべい。焼き型からはみ出たカリカリの『みみ』が香ばしくて大人気！', unlockCondition: { type: 'count', target: 20, text: '累計20枚焼き上げ' }, color: '#78350f', bgGrad: 'radial-gradient(circle, #ffffff 0%, #fef3c7 70%, #d97706 100%)', border: '#b45309', shape: 'nambu', topping: 'nambu' },
+            { id: 'kawara', name: '瓦せんべい', desc: '【日本・兵庫】カステラ風味の硬焼き角せんべい。', trivia: '神戸発祥の歴史ある高級銘菓。瓦の形をしており、卵と小麦粉、砂糖で焼かれたカステラに似た優しい甘さです。', unlockCondition: { type: 'count', target: 30, text: '累計30枚焼き上げ' }, color: '#92400e', bgGrad: 'radial-gradient(circle, #fef3c7 0%, #d97706 60%, #451a03 100%)', border: '#292524', shape: 'square', topping: 'kawara' },
+            { id: 'yatsuhashi', name: '焼き八ツ橋', desc: '【日本・京都】ニッキの香りが漂う曲面型の伝統煎餅。', trivia: '琴の形を模して湾曲させて焼かれた京都の伝統煎餅。ニッキ（シナモン）のフレッシュな香りが鼻に抜けます。', unlockCondition: { type: 'time', target: 120, text: '累計120分(2時間)集中' }, color: '#78350f', bgGrad: 'radial-gradient(circle, #fffbeb 0%, #f59e0b 60%, #78350f 100%)', border: '#451a03', shape: 'round', topping: 'yatsuhashi' },
+            { id: 'arare', name: 'ひな焼きあられ', desc: '【日本】もち米から作ったカリッと小粒な焼きあられ。', trivia: 'もち米を原料として作られる小粒なお菓子。ひな祭りなどで親しまれ、自然な米の甘みと塩気が特徴です。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#f43f5e', bgGrad: 'radial-gradient(circle, #fff1f2 0%, #fde047 50%, #4ade80 100%)', border: '#0284c7', shape: 'round', topping: null },
+            { id: 'isobe', name: '焼き磯べ餅', desc: '【日本】香ばしい醤油を塗り海苔を巻いた焼き餅。', trivia: '香ばしく焼いたお餅に醤油を絡め海苔を巻き付けた和食の原点。せんべいの祖先とも言える伝統的な一品です。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#1c1917', bgGrad: 'radial-gradient(circle, #ffffff 0%, #f5f5f4 60%, #a8a29e 100%)', border: '#1c1917', shape: 'square', topping: 'isobe' },
+            { id: 'shoga', name: '生姜蜜甘せんべい', desc: '【日本】すっきり生姜蜜をのせた薄焼き伝統和菓子。', trivia: 'すりおろした生姜の蜜を塗った上品な薄焼き和菓子。生姜の爽やかな辛みと砂糖の甘さが絶妙にマッチします。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#d97706', bgGrad: 'radial-gradient(circle, #ffffff 0%, #fef3c7 60%, #f59e0b 100%)', border: '#d97706', shape: 'round', topping: null },
+            { id: 'salad', name: 'サラダせんべい', desc: '【日本】あっさり塩味のサクッと軽い白い煎餅。', trivia: '『サラダ』とは野菜ではなく『サラダ油』のこと！昭和時代に油を表面に吹きかけて塩をなじませた製法が名前の由来です。', unlockCondition: { type: 'time', target: 30, text: '累計30分集中' }, color: '#a8a29e', bgGrad: 'radial-gradient(circle, #ffffff 0%, #f5f5f4 70%, #e7e5e4 100%)', border: '#d6d3d1', shape: 'round', topping: null },
+            { id: 'ebisen', name: '和風えびせんべい', desc: '【日本】海の香りが広がるピンクの薄焼き。', trivia: '海老を殻ごとすりつぶして生地に練り込んでいるため、カルシウムたっぷり！軽くて何枚でも食べられるサクサク食感です。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#fda4af', bgGrad: 'radial-gradient(circle, #ffffff 0%, #ffe4e6 60%, #f43f5e 100%)', border: '#fb7185', shape: 'round', topping: null },
+
+            // 世界の香ばしいパリパリお菓子
+            { id: 'stroop', name: 'ストループワッフル', desc: '【オランダ】キャラメルを挟んだ薄焼きワッフル。', trivia: 'オランダの伝統お菓子。熱いコーヒーや紅茶を入れたカップの上に数分載せると、中のキャラメルがとろっと溶けて絶品になります！', unlockCondition: { type: 'time', target: 300, text: '累計300分(5時間)集中' }, color: '#78350f', bgGrad: 'radial-gradient(circle, #fefce8 0%, #f59e0b 60%, #78350f 100%)', border: '#451a03', shape: 'round', topping: 'stroop' },
+            { id: 'fortune', name: 'フォーチュンクッキー', desc: '【アメリカ/中国】割るとおみくじが出るパリパリ煎餅。', trivia: 'アメリカの中華料理店でおなじみですが、実は日本の神社で売られていた『辻占煎餅（つじうらせんべい）』が日系移民によってアメリカへ渡ったのが起源です！', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#d97706', bgGrad: 'radial-gradient(circle, #ffffff 0%, #fef3c7 60%, #f59e0b 100%)', border: '#b45309', shape: 'round', topping: null },
+            { id: 'tuile', name: 'フランス風アーモンドチュイル', desc: '【フランス】瓦の形をした香ばしいアーモンド薄焼き菓子。', trivia: '『Tuile（チュイル）』とはフランス語で『屋根瓦』のこと。オーブンから出してすぐ熱いうちに丸い棒に押し当てて湾曲させて作られます。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#b45309', bgGrad: 'radial-gradient(circle, #fffbeb 0%, #f59e0b 60%, #78350f 100%)', border: '#78350f', shape: 'round', topping: 'nambu' },
+            { id: 'tacos', name: 'タコスチップス', desc: '【メキシコ】香ばしいトウモロコシのパリパリチップス。', trivia: 'トウモロコシ生地（トルティーヤ）を揚げたメキシコ発祥のチップス。クリスピーでパリッとした軽い歯ごたえがクセになります。', unlockCondition: { type: 'recover', target: 200, text: '累計200pt回復' }, color: '#dc2626', bgGrad: 'radial-gradient(circle, #fefce8 0%, #fde047 60%, #d97706 100%)', border: '#b45309', shape: 'square', topping: 'tacos' },
+            { id: 'pita', name: '薄焼きピタブレッド煎餅', desc: '【中東】オリーブオイルとハーブ香るカリッと薄焼きパン。', trivia: '中東の伝統的なポケットパン『ピタパン』をカリカリに薄焼き乾燥させたクリスピーなお煎餅状スナックです。', unlockCondition: { type: 'random', text: 'ポモドーロ達成時に確率で解放' }, color: '#a8a29e', bgGrad: 'radial-gradient(circle, #ffffff 0%, #fef3c7 60%, #d97706 100%)', border: '#78350f', shape: 'round', topping: 'goma' },
+            { id: 'gold', name: 'プレミアム金箔極上煎餅', desc: '【特別】集中を極めた者だけの伝説の金箔せんべい。', trivia: '石川県金沢の食用純金箔を贅沢に使用！長時間の猛勉強を成し遂げた真の集中力マスターに贈られる最高の勲章です。', unlockCondition: { type: 'count', target: 50, text: '累計50枚焼き上げ達成' }, color: '#eab308', bgGrad: 'radial-gradient(circle, #fefce8 0%, #fde047 50%, #ca8a04 100%)', border: '#854d0e', shape: 'round', topping: 'gold' }
+        ];
+
+        let state = {
+            mode: 'work', // 'work' | 'rest'
+            isRunning: false,
+            timeLeft: 25 * 60,
+            workDuration: 25 * 60,
+            restDuration: 5 * 60,
+            energy: 70, // 0 - 100
+            currentSenbeiIndex: 0,
+            bakedCount: 0,
+            totalWorkSeconds: 0,
+            recoveredPoints: 0,
+            unlockedSenbei: ['shoyu'],
+            crunchCountInRest: 0,
+            selectedDetailIndex: 0
+        };
+
+        let timerInterval = null;
+        let audioCtx = null;
+
+        // DOM elements
+        const timerDisplay = document.getElementById('timerDisplay');
+        const btnStartPause = document.getElementById('btnStartPause');
+        const btnStartIcon = document.getElementById('btnStartIcon');
+        const btnStartText = document.getElementById('btnStartText');
+        const btnReset = document.getElementById('btnReset');
+        const tabWork = document.getElementById('tabWork');
+        const tabRest = document.getElementById('tabRest');
+        const energyBar = document.getElementById('energyBar');
+        const energyText = document.getElementById('energyText');
+        const browningOverlay = document.getElementById('browningOverlay');
+        const stageLabel = document.getElementById('stageLabel');
+        const senbeiVisual = document.getElementById('senbeiVisual');
+        const senbeiContainer = document.getElementById('senbeiContainer');
+        const nambuRim = document.getElementById('nambuRim');
+        const senbeiTexture = document.getElementById('senbeiTexture');
+        const eatPrompt = document.getElementById('eatPrompt');
+        const statusBadgeDot = document.getElementById('statusBadgeDot');
+        const statusText = document.getElementById('statusText');
+        const headerSenbeiCount = document.getElementById('headerSenbeiCount');
+        const statTotalTime = document.getElementById('statTotalTime');
+        const statSenbeiCount = document.getElementById('statSenbeiCount');
+        const statRecovered = document.getElementById('statRecovered');
+        const chkSound = document.getElementById('chkSound');
+        const chkBgm = document.getElementById('chkBgm');
+        const btnUnlockAll = document.getElementById('btnUnlockAll');
+        const btnResetCollection = document.getElementById('btnResetCollection');
+
+        // Get Modal elements
+        const modalGet = document.getElementById('modalGet');
+        const getSenbeiName = document.getElementById('getSenbeiName');
+        const getSenbeiDesc = document.getElementById('getSenbeiDesc');
+        const getIconContainer = document.getElementById('getIconContainer');
+        const btnGetConfirm = document.getElementById('btnGetConfirm');
+
+        // Modal Notice elements
+        const modalNotice = document.getElementById('modalNotice');
+        const noticeTitle = document.getElementById('noticeTitle');
+        const noticeMessage = document.getElementById('noticeMessage');
+        const noticeIcon = document.getElementById('noticeIcon');
+        const btnCloseNotice = document.getElementById('btnCloseNotice');
+        const triviaBox = document.getElementById('triviaBox');
+        const praiseText = document.getElementById('praiseText');
+        const triviaText = document.getElementById('triviaText');
+
+        // Modal elements
+        const modalCollection = document.getElementById('modalCollection');
+        const modalSettings = document.getElementById('modalSettings');
+        const btnOpenCollection = document.getElementById('btnOpenCollection');
+        const btnCloseCollection = document.getElementById('btnCloseCollection');
+        const btnOpenSettings = document.getElementById('btnOpenSettings');
+        const btnCloseSettings = document.getElementById('btnCloseSettings');
+        const collectionGrid = document.getElementById('collectionGrid');
+        const settingsForm = document.getElementById('settingsForm');
+
+        // Detail Modal elements
+        const modalDetail = document.getElementById('modalDetail');
+        const btnCloseDetail = document.getElementById('btnCloseDetail');
+        const detailIconContainer = document.getElementById('detailIconContainer');
+        const detailName = document.getElementById('detailName');
+        const detailDesc = document.getElementById('detailDesc');
+        const detailTrivia = document.getElementById('detailTrivia');
+        const detailBadge = document.getElementById('detailBadge');
+        const btnSelectSenbei = document.getElementById('btnSelectSenbei');
+
+        // ==========================================
+        // 破片パーティクル用 Canvas 描画のコンテキスト宣言
+        // ==========================================
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        // ==========================================
+        // 紙吹雪（Confetti）アニメーション
+        // ==========================================
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let confettiList = [];
+
+        function resizeConfettiCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfettiCanvas);
+        resizeConfettiCanvas();
+
+        function launchConfetti() {
+            confettiList = [];
+            const colors = ['#f59e0b', '#d97706', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#fde047'];
+            for (let i = 0; i < 90; i++) {
+                confettiList.push({
+                    x: Math.random() * confettiCanvas.width,
+                    y: -10 - Math.random() * confettiCanvas.height * 0.5,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: 2 + Math.random() * 5,
+                    size: 6 + Math.random() * 8,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.2,
+                    alpha: 1
+                });
+            }
+        }
+
+        function updateConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            for (let i = confettiList.length - 1; i >= 0; i--) {
+                const c = confettiList[i];
+                c.x += c.vx;
+                c.y += c.vy;
+                c.rotation += c.vRot;
+
+                confettiCtx.save();
+                confettiCtx.globalAlpha = c.alpha;
+                confettiCtx.translate(c.x, c.y);
+                confettiCtx.rotate(c.rotation);
+                confettiCtx.fillStyle = c.color;
+                confettiCtx.fillRect(-c.size / 2, -c.size / 2, c.size, c.size * 0.7);
+                confettiCtx.restore();
+
+                if (c.y > confettiCanvas.height) {
+                    confettiList.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(updateConfetti);
+        }
+        updateConfetti();
+
+        // ==========================================
+        // 新お菓子ゲットお祝いモーダルの表示処理
+        // ==========================================
+        function showGetModal(senbei) {
+            getSenbeiName.textContent = senbei.name;
+            getSenbeiDesc.textContent = senbei.desc;
+
+            // ビジュアル設定
+            getIconContainer.style.background = senbei.bgGrad;
+            getIconContainer.style.borderColor = senbei.border || '#a16207';
+
+            let itemIcon = '';
+            if (senbei.topping === 'nori') itemIcon = '<div class="w-14 h-20 bg-stone-900 rounded-sm transform -rotate-6 shadow-md"></div>';
+            else if (senbei.topping === 'zarame') itemIcon = '<div class="flex gap-1.5"><div class="w-4.5 h-4.5 bg-white border border-stone-200 rounded-sm shadow-sm rotate-12"></div><div class="w-4 h-4 bg-white border border-stone-200 rounded-sm shadow-sm -rotate-45"></div></div>';
+            else if (senbei.topping === 'chili') itemIcon = '<i class="fa-solid fa-pepper-hot text-red-600 text-4xl drop-shadow"></i>';
+            else if (senbei.topping === 'goma') itemIcon = '<i class="fa-solid fa-seedling text-stone-900 text-3xl"></i>';
+            else if (senbei.topping === 'matcha') itemIcon = '<div class="w-16 h-16 rounded-full bg-emerald-800/90 border-4 border-emerald-600 shadow"></div>';
+            else if (senbei.topping === 'cheese') itemIcon = '<div class="w-16 h-16 bg-amber-400 rounded-xl transform rotate-12 shadow-md"></div>';
+            else if (senbei.topping === 'ebi' || senbei.id === 'ebisen') itemIcon = '<i class="fa-solid fa-shrimp text-rose-500 text-4xl transform -rotate-12 drop-shadow"></i>';
+            else if (senbei.topping === 'nambu') itemIcon = '<div class="w-10 h-6 bg-amber-900 rounded-full border-2 border-amber-950 shadow"></div>';
+            else if (senbei.topping === 'kawara') itemIcon = '<span class="font-kiwi font-bold text-3xl text-amber-950">瓦</span>';
+            else if (senbei.topping === 'gold') itemIcon = '<i class="fa-solid fa-crown text-yellow-500 text-4xl drop-shadow"></i>';
+            else if (senbei.topping === 'stroop') itemIcon = '<i class="fa-solid fa-stroopwafel text-amber-900 text-4xl"></i>';
+            else if (senbei.topping === 'yatsuhashi') itemIcon = '<span class="font-kiwi text-base font-bold text-amber-950">八ツ橋</span>';
+            else if (senbei.topping === 'isobe') itemIcon = '<div class="w-12 h-16 bg-stone-900 rounded-md shadow-md"></div>';
+            else if (senbei.topping === 'tacos') itemIcon = '<i class="fa-solid fa-play text-amber-600 text-3xl transform rotate-90 drop-shadow"></i>';
+            else itemIcon = '<i class="fa-solid fa-cookie text-amber-800/70 text-4xl"></i>';
+
+            getIconContainer.innerHTML = itemIcon;
+            
+            // ファンファーレ音＆紙吹雪発射！
+            playFanfareSound();
+            launchConfetti();
+
+            modalGet.classList.remove('hidden');
+        }
+
+        btnGetConfirm.addEventListener('click', () => {
+            modalGet.classList.add('hidden');
+        });
+
+        // ==========================================
+        // カスタムポップアップ通知＆ねぎらい処理
+        // ==========================================
+        function showNotice(title, message, iconClass = "fa-solid fa-cookie-bite text-amber-600", showTrivia = false) {
+            noticeTitle.textContent = title;
+            noticeMessage.textContent = message;
+            noticeIcon.innerHTML = `<i class="${iconClass}"></i>`;
+
+            if (showTrivia) {
+                triviaBox.classList.remove('hidden');
+                praiseText.textContent = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+                triviaText.textContent = TRIVIA_LIST[Math.floor(Math.random() * TRIVIA_LIST.length)];
+            } else {
+                triviaBox.classList.add('hidden');
+            }
+
+            modalNotice.classList.remove('hidden');
+        }
+
+        btnCloseNotice.addEventListener('click', () => {
+            modalNotice.classList.add('hidden');
+        });
+
+        // ==========================================
+        // 条件チェック＆自動解放ロジック（GET演出連動）
+        // ==========================================
+        function checkUnlockConditions() {
+            let newlyUnlockedSenbei = null;
+            const totalMin = Math.floor(state.totalWorkSeconds / 60);
+
+            SENBEI_TYPES.forEach(senbei => {
+                if (state.unlockedSenbei.includes(senbei.id)) return;
+
+                const cond = senbei.unlockCondition;
+                let unlock = false;
+
+                if (cond.type === 'count' && state.bakedCount >= cond.target) {
+                    unlock = true;
+                } else if (cond.type === 'time' && totalMin >= cond.target) {
+                    unlock = true;
+                } else if (cond.type === 'recover' && state.recoveredPoints >= cond.target) {
+                    unlock = true;
+                }
+
+                if (unlock) {
+                    state.unlockedSenbei.push(senbei.id);
+                    newlyUnlockedSenbei = senbei;
+                }
+            });
+
+            if (newlyUnlockedSenbei) {
+                showGetModal(newlyUnlockedSenbei);
+            }
+        }
+
+        // 全解放＆リセットボタンの処理
+        btnUnlockAll.addEventListener('click', () => {
+            state.unlockedSenbei = SENBEI_TYPES.map(s => s.id);
+            renderCollection();
+            playFanfareSound();
+            launchConfetti();
+        });
+
+        btnResetCollection.addEventListener('click', () => {
+            state.unlockedSenbei = ['shoyu'];
+            state.currentSenbeiIndex = 0;
+            applySenbeiVisual(SENBEI_TYPES[0]);
+            renderCollection();
+        });
+
+        // ==========================================
+        // Web Audio API による自作効果音合成器
+        // ==========================================
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // せんべいをバリッと割る音
+        function playCrunchSound() {
+            if (!chkSound.checked) return;
+            initAudio();
+
+            const bufferSize = audioCtx.sampleRate * 0.15;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+
+            const whiteNoise = audioCtx.createBufferSource();
+            whiteNoise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(3000, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.12);
+            filter.Q.value = 3;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.14);
+
+            whiteNoise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            whiteNoise.start();
+
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.08);
+
+            oscGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.09);
+        }
+
+        // 解放ファンファーレ音（ピロリ～ン♪）
+        function playFanfareSound() {
+            if (!chkSound.checked) return;
+            initAudio();
+
+            const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+            notes.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+
+                const startTime = audioCtx.currentTime + idx * 0.09;
+                gain.gain.setValueAtTime(0.4, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(startTime);
+                osc.stop(startTime + 0.6);
+            });
+        }
+
+        // 完成チャイム音
+        function playChimeSound() {
+            if (!chkSound.checked) return;
+            initAudio();
+
+            const freqs = [523.25, 659.25, 783.99, 1046.50];
+            freqs.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+
+                const startTime = audioCtx.currentTime + idx * 0.12;
+                gain.gain.setValueAtTime(0.3, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.2);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(startTime);
+                osc.stop(startTime + 1.2);
+            });
+        }
+
+        // 簡易BGM
+        let bgmInterval = null;
+        function toggleBGM(enable) {
+            if (enable) {
+                initAudio();
+                if (bgmInterval) clearInterval(bgmInterval);
+                bgmInterval = setInterval(() => {
+                    if (!chkBgm.checked) return;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    const notes = [440, 493.88, 554.37, 659.25, 739.99];
+                    const note = notes[Math.floor(Math.random() * notes.length)];
+                    osc.frequency.setValueAtTime(note, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(note * 0.5, audioCtx.currentTime + 0.4);
+
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                }, 2500);
+            } else {
+                if (bgmInterval) {
+                    clearInterval(bgmInterval);
+                    bgmInterval = null;
+                }
+            }
+        }
+
+        // ==========================================
+        // 破片パーティクル演出 (Canvas)
+        // ==========================================
+        function createCrunchParticles(x, y, color) {
+            for (let i = 0; i < 25; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 3 + Math.random() * 7;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    size: 3 + Math.random() * 8,
+                    color: color || '#d97706',
+                    rotation: Math.random() * Math.PI,
+                    vRot: (Math.random() - 0.5) * 0.3,
+                    alpha: 1,
+                    life: 0.95 + Math.random() * 0.04
+                });
+            }
+        }
+
+        function updateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.25;
+                p.rotation += p.vRot;
+                p.alpha *= p.life;
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.8);
+                ctx.restore();
+
+                if (p.alpha < 0.05) {
+                    particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(updateParticles);
+        }
+        updateParticles();
+
+        // ==========================================
+        // タイマーコア機能 & 描画更新
+        // ==========================================
+        function updateDisplay() {
+            const mins = Math.floor(state.timeLeft / 60);
+            const secs = state.timeLeft % 60;
+            timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (state.mode === 'work') {
+                const progress = 1 - (state.timeLeft / state.workDuration);
+                browningOverlay.style.opacity = Math.min(progress * 0.9, 0.85);
+
+                if (progress < 0.25) {
+                    stageLabel.textContent = '生の生地（準備中）';
+                } else if (progress < 0.6) {
+                    stageLabel.textContent = 'ふっくら手焼き中...';
+                } else if (progress < 0.9) {
+                    stageLabel.textContent = '特製醤油の塗り込み！';
+                } else {
+                    stageLabel.textContent = 'こんがりパリッと完成間近！';
+                }
+            } else {
+                stageLabel.textContent = '焼きたてを召し上がれ！';
+            }
+
+            headerSenbeiCount.textContent = state.bakedCount;
+            statSenbeiCount.textContent = `${state.bakedCount} 枚`;
+            statTotalTime.textContent = `${Math.floor(state.totalWorkSeconds / 60)} 分`;
+            statRecovered.textContent = `${state.recoveredPoints} pt`;
+
+            energyBar.style.width = `${state.energy}%`;
+            energyText.textContent = `${Math.round(state.energy)}%`;
+
+            checkUnlockConditions();
+        }
+
+        function setMode(newMode) {
+            state.mode = newMode;
+            pauseTimer();
+
+            if (newMode === 'work') {
+                tabWork.className = "flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 bg-wafuu-primary text-white shadow-sm font-bold";
+                tabRest.className = "flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 text-stone-500 hover:text-stone-800 font-bold";
+                state.timeLeft = state.workDuration;
+                btnStartText.textContent = "焼き始める (集中開始)";
+                statusText.textContent = "じっくり集中してせんべいを焼こう";
+                statusBadgeDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                eatPrompt.classList.add('hidden');
+                browningOverlay.style.opacity = 0;
+                applySenbeiVisual(SENBEI_TYPES[state.currentSenbeiIndex]);
+            } else {
+                tabRest.className = "flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm font-bold";
+                tabWork.className = "flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-2 text-stone-500 hover:text-stone-800 font-bold";
+                state.timeLeft = state.restDuration;
+                btnStartText.textContent = "休憩スタート";
+                statusText.textContent = "せんべいをタップしてエネルギー回復！";
+                statusBadgeDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                eatPrompt.classList.remove('hidden');
+                state.crunchCountInRest = 0;
+            }
+            updateDisplay();
+        }
+
+        function applySenbeiVisual(senbeiData) {
+            senbeiVisual.style.background = senbeiData.bgGrad;
+            senbeiVisual.style.borderColor = senbeiData.border || '#a16207';
+
+            // 南部せんべいの耳
+            if (senbeiData.shape === 'nambu') {
+                nambuRim.classList.remove('hidden');
+            } else {
+                nambuRim.classList.add('hidden');
+            }
+
+            // サラダせんべいなど表面テクスチャコントロール
+            if (senbeiData.id === 'salad' || senbeiData.id === 'ebisen') {
+                senbeiTexture.style.opacity = '0.1';
+            } else {
+                senbeiTexture.style.opacity = '0.35';
+            }
+
+            // 形状の切り替え
+            if (senbeiData.shape === 'square') {
+                senbeiVisual.style.borderRadius = '28px';
+                browningOverlay.style.borderRadius = '24px';
+                eatPrompt.style.borderRadius = '24px';
+            } else {
+                senbeiVisual.style.borderRadius = '50%';
+                browningOverlay.style.borderRadius = '50%';
+                eatPrompt.style.borderRadius = '50%';
+            }
+            
+            // トッピング切り替え
+            const toppings = ['Nori', 'Zarame', 'Chili', 'Goma', 'Matcha', 'Cheese', 'Takoyaki', 'Ebi', 'Gold', 'Potapota', 'Nambu', 'Kawara', 'Stroop', 'Yatsuhashi', 'Isobe', 'Tacos'];
+            toppings.forEach(t => {
+                const el = document.getElementById(`topping${t}`);
+                if (el) {
+                    if (senbeiData.topping && senbeiData.topping.toLowerCase() === t.toLowerCase()) {
+                        el.classList.remove('hidden');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        function startTimer() {
+            if (state.isRunning) return;
+            state.isRunning = true;
+            btnStartIcon.className = "fa-solid fa-pause";
+            btnStartText.textContent = state.mode === 'work' ? "一時停止" : "休憩を一時停止";
+
+            timerInterval = setInterval(() => {
+                if (state.timeLeft > 0) {
+                    state.timeLeft--;
+                    if (state.mode === 'work') {
+                        state.totalWorkSeconds++;
+                        state.energy = Math.max(0, state.energy - (0.1 / (state.workDuration / 60)));
+                    }
+                    updateDisplay();
+                } else {
+                    onTimerComplete();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            state.isRunning = false;
+            if (timerInterval) clearInterval(timerInterval);
+            btnStartIcon.className = "fa-solid fa-play";
+            btnStartText.textContent = state.mode === 'work' ? "焼き始める (集中開始)" : "休憩スタート";
+        }
+
+        // タイマー終了時の自動遷移・ねぎらい＆豆知識表示処理
+        function onTimerComplete() {
+            pauseTimer();
+            playChimeSound();
+
+            if (state.mode === 'work') {
+                state.bakedCount++;
+                unlockRandomSenbei();
+                
+                showNotice(
+                    '🎉 せんべいが焼き上がりました！',
+                    '集中タイム完了です！自動的に休憩タイマーがスタートしました。',
+                    'fa-solid fa-cookie-bite text-amber-600',
+                    true
+                );
+
+                setMode('rest');
+                startTimer();
+            } else {
+                showNotice(
+                    '🍵 休憩タイム終了！',
+                    'しっかりリフレッシュできましたか？準備ができたら次のせんべいを焼き始めましょう！',
+                    'fa-solid fa-mug-hot text-emerald-600',
+                    false
+                );
+                setMode('work');
+            }
+        }
+
+        function unlockRandomSenbei() {
+            const randomCandidates = SENBEI_TYPES.filter(s => s.unlockCondition.type === 'random' && !state.unlockedSenbei.includes(s.id));
+            if (randomCandidates.length > 0 && Math.random() < 0.6) {
+                const newSenbei = randomCandidates[Math.floor(Math.random() * randomCandidates.length)];
+                state.unlockedSenbei.push(newSenbei.id);
+                showGetModal(newSenbei);
+            }
+        }
+
+        // ==========================================
+        // ピックアップ詳細モーダルの処理
+        // ==========================================
+        function openDetailModal(senbeiIndex) {
+            state.selectedDetailIndex = senbeiIndex;
+            const senbei = SENBEI_TYPES[senbeiIndex];
+
+            detailName.textContent = senbei.name;
+            detailDesc.textContent = senbei.desc;
+            detailTrivia.textContent = senbei.trivia;
+
+            // 国バッジの表示
+            if (senbei.desc.includes('オランダ')) detailBadge.textContent = '🇳🇱 オランダ名物';
+            else if (senbei.desc.includes('フランス')) detailBadge.textContent = '🇫🇷 フランス名物';
+            else if (senbei.desc.includes('メキシコ')) detailBadge.textContent = '🇲🇽 メキシコ名物';
+            else if (senbei.desc.includes('アメリカ')) detailBadge.textContent = '🇺🇸/🇨🇳 フォーチュン';
+            else if (senbei.desc.includes('中東')) detailBadge.textContent = '🌍 中東名物';
+            else if (senbei.desc.includes('特別')) detailBadge.textContent = '✨ プレミアム限定';
+            else detailBadge.textContent = '🇯🇵 日本の伝統菓子';
+
+            // アイコンビジュアル作成
+            detailIconContainer.style.background = senbei.bgGrad;
+            detailIconContainer.style.borderColor = senbei.border || '#a16207';
+
+            let itemIcon = '';
+            if (senbei.topping === 'nori') {
+                itemIcon = '<div class="w-12 h-18 bg-stone-900 rounded-sm transform -rotate-6 shadow-md"></div>';
+            } else if (senbei.topping === 'zarame') {
+                itemIcon = '<div class="flex gap-1.5"><div class="w-4 h-4 bg-white border border-stone-200 rounded-sm shadow-sm rotate-12"></div><div class="w-3.5 h-3.5 bg-white border border-stone-200 rounded-sm shadow-sm -rotate-45"></div></div>';
+            } else if (senbei.topping === 'chili') {
+                itemIcon = '<i class="fa-solid fa-pepper-hot text-red-600 text-3xl drop-shadow"></i>';
+            } else if (senbei.topping === 'goma') {
+                itemIcon = '<i class="fa-solid fa-seedling text-stone-900 text-2xl"></i>';
+            } else if (senbei.topping === 'matcha') {
+                itemIcon = '<div class="w-14 h-14 rounded-full bg-emerald-800/90 border-4 border-emerald-600 shadow"></div>';
+            } else if (senbei.topping === 'cheese') {
+                itemIcon = '<div class="w-14 h-14 bg-amber-400 rounded-xl transform rotate-12 shadow-md"></div>';
+            } else if (senbei.topping === 'ebi' || senbei.id === 'ebisen') {
+                itemIcon = '<i class="fa-solid fa-shrimp text-rose-500 text-3xl transform -rotate-12 drop-shadow"></i>';
+            } else if (senbei.topping === 'nambu') {
+                itemIcon = '<div class="w-8 h-5 bg-amber-900 rounded-full border-2 border-amber-950 shadow"></div>';
+            } else if (senbei.topping === 'kawara') {
+                itemIcon = '<span class="font-kiwi font-bold text-2xl text-amber-950">瓦</span>';
+            } else if (senbei.topping === 'gold') {
+                itemIcon = '<i class="fa-solid fa-crown text-yellow-500 text-3xl drop-shadow"></i>';
+            } else if (senbei.topping === 'stroop') {
+                itemIcon = '<i class="fa-solid fa-stroopwafel text-amber-900 text-3xl"></i>';
+            } else if (senbei.topping === 'yatsuhashi') {
+                itemIcon = '<span class="font-kiwi text-sm font-bold text-amber-950">八ツ橋</span>';
+            } else if (senbei.topping === 'isobe') {
+                itemIcon = '<div class="w-10 h-14 bg-stone-900 rounded-md shadow-md"></div>';
+            } else if (senbei.topping === 'tacos') {
+                itemIcon = '<i class="fa-solid fa-play text-amber-600 text-2xl transform rotate-90 drop-shadow"></i>';
+            } else {
+                itemIcon = '<i class="fa-solid fa-cookie text-amber-800/70 text-3xl"></i>';
+            }
+
+            detailIconContainer.innerHTML = itemIcon;
+            modalDetail.classList.remove('hidden');
+        }
+
+        btnCloseDetail.addEventListener('click', () => {
+            modalDetail.classList.add('hidden');
+        });
+
+        btnSelectSenbei.addEventListener('click', () => {
+            state.currentSenbeiIndex = state.selectedDetailIndex;
+            applySenbeiVisual(SENBEI_TYPES[state.currentSenbeiIndex]);
+            modalDetail.classList.add('hidden');
+            modalCollection.classList.add('hidden');
+            renderCollection();
+            playChimeSound();
+        });
+
+        // ==========================================
+        // イベントリスナー設定
+        // ==========================================
+        btnStartPause.addEventListener('click', () => {
+            if (state.isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            pauseTimer();
+            state.timeLeft = state.mode === 'work' ? state.workDuration : state.restDuration;
+            updateDisplay();
+        });
+
+        tabWork.addEventListener('click', () => setMode('work'));
+        tabRest.addEventListener('click', () => setMode('rest'));
+
+        senbeiContainer.addEventListener('click', (e) => {
+            playCrunchSound();
+            senbeiVisual.classList.add('crunch-active');
+            setTimeout(() => senbeiVisual.classList.remove('crunch-active'), 150);
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - canvasRect.left;
+            const clickY = e.clientY - canvasRect.top;
+            const currentType = SENBEI_TYPES[state.currentSenbeiIndex];
+            createCrunchParticles(clickX, clickY, currentType.color);
+
+            if (state.mode === 'rest') {
+                state.crunchCountInRest++;
+                const recoverAmt = 8;
+                state.energy = Math.min(100, state.energy + recoverAmt);
+                state.recoveredPoints += recoverAmt;
+                updateDisplay();
+
+                if (state.crunchCountInRest >= 5) {
+                    eatPrompt.textContent = "完食！エネルギー全快！";
+                }
+            } else {
+                statusText.textContent = "焦がさないようにじっくり集中しよう！";
+                setTimeout(() => {
+                    statusText.textContent = "じっくり集中してせんべいを焼こう";
+                }, 2000);
+            }
+        });
+
+        // モーダル処理
+        btnOpenCollection.addEventListener('click', () => {
+            renderCollection();
+            modalCollection.classList.remove('hidden');
+        });
+        btnCloseCollection.addEventListener('click', () => modalCollection.classList.add('hidden'));
+
+        btnOpenSettings.addEventListener('click', () => modalSettings.classList.remove('hidden'));
+        btnCloseSettings.addEventListener('click', () => modalSettings.classList.add('hidden'));
+
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const workM = parseInt(document.getElementById('inputWorkMin').value) || 25;
+            const restM = parseInt(document.getElementById('inputRestMin').value) || 5;
+
+            state.workDuration = workM * 60;
+            state.restDuration = restM * 60;
+
+            if (state.mode === 'work') state.timeLeft = state.workDuration;
+            else state.timeLeft = state.restDuration;
+
+            modalSettings.classList.add('hidden');
+            updateDisplay();
+        });
+
+        chkBgm.addEventListener('change', (e) => {
+            toggleBGM(e.target.checked);
+        });
+
+        // 図鑑描画（未解放のものは完全に隠す＆タップ不可）
+        function renderCollection() {
+            collectionGrid.innerHTML = '';
+            SENBEI_TYPES.forEach((senbei, index) => {
+                const isUnlocked = state.unlockedSenbei.includes(senbei.id);
+                const isSelected = SENBEI_TYPES[state.currentSenbeiIndex].id === senbei.id;
+                
+                const card = document.createElement('div');
+                card.className = `p-2.5 rounded-2xl border flex flex-col items-center text-center gap-1.5 transition ${
+                    isUnlocked ? 'bg-white border-amber-200 shadow-sm hover:scale-105 active:scale-95 cursor-pointer' : 'bg-stone-200/70 border-stone-300 opacity-70 select-none'
+                } ${isSelected ? 'ring-2 ring-amber-500 border-amber-500' : ''}`;
+
+                // モチーフアイコン（未解放時は「？」マーク）
+                let itemIcon = '';
+                if (isUnlocked) {
+                    if (senbei.topping === 'nori') {
+                        itemIcon = '<div class="w-6 h-9 bg-stone-900 rounded-sm transform -rotate-6 shadow"></div>';
+                    } else if (senbei.topping === 'zarame') {
+                        itemIcon = '<div class="flex gap-1"><div class="w-2.5 h-2.5 bg-white border border-stone-200 rounded-sm shadow-sm rotate-12"></div><div class="w-2 h-2 bg-white border border-stone-200 rounded-sm shadow-sm -rotate-45"></div></div>';
+                    } else if (senbei.topping === 'chili') {
+                        itemIcon = '<i class="fa-solid fa-pepper-hot text-red-600 text-lg"></i>';
+                    } else if (senbei.topping === 'goma') {
+                        itemIcon = '<div class="flex gap-1 text-stone-900 font-bold text-xs"><i class="fa-solid fa-seedling"></i></div>';
+                    } else if (senbei.topping === 'matcha') {
+                        itemIcon = '<div class="w-7 h-7 rounded-full bg-emerald-800/80 border-2 border-emerald-600"></div>';
+                    } else if (senbei.topping === 'cheese') {
+                        itemIcon = '<div class="w-7 h-7 bg-amber-400 rounded-md transform rotate-12 shadow"></div>';
+                    } else if (senbei.topping === 'ebi' || senbei.id === 'ebisen') {
+                        itemIcon = '<i class="fa-solid fa-shrimp text-rose-500 text-lg transform -rotate-12"></i>';
+                    } else if (senbei.topping === 'nambu') {
+                        itemIcon = '<div class="w-5 h-3 bg-amber-900 rounded-full border border-amber-950"></div>';
+                    } else if (senbei.topping === 'kawara') {
+                        itemIcon = '<span class="font-kiwi font-bold text-xs text-amber-950">瓦</span>';
+                    } else if (senbei.topping === 'gold') {
+                        itemIcon = '<i class="fa-solid fa-crown text-yellow-500 text-lg"></i>';
+                    } else if (senbei.topping === 'stroop') {
+                        itemIcon = '<i class="fa-solid fa-stroopwafel text-amber-800 text-lg"></i>';
+                    } else if (senbei.topping === 'yatsuhashi') {
+                        itemIcon = '<span class="font-kiwi text-[10px] font-bold text-amber-950">八ツ橋</span>';
+                    } else if (senbei.topping === 'isobe') {
+                        itemIcon = '<div class="w-6 h-8 bg-stone-900 rounded-sm"></div>';
+                    } else if (senbei.topping === 'tacos') {
+                        itemIcon = '<i class="fa-solid fa-play text-amber-600 text-sm transform rotate-90"></i>';
+                    } else {
+                        itemIcon = '<i class="fa-solid fa-cookie text-amber-700/60 text-lg"></i>';
+                    }
+                } else {
+                    itemIcon = '<i class="fa-solid fa-question text-stone-400 text-xl font-black"></i>';
+                }
+
+                // 条件テキスト・進捗計算
+                let condText = senbei.unlockCondition.text;
+                if (!isUnlocked) {
+                    const cond = senbei.unlockCondition;
+                    if (cond.type === 'count') {
+                        condText += ` (${state.bakedCount}/${cond.target}枚)`;
+                    } else if (cond.type === 'time') {
+                        const min = Math.floor(state.totalWorkSeconds / 60);
+                        condText += ` (${min}/${cond.target}分)`;
+                    } else if (cond.type === 'recover') {
+                        condText += ` (${state.recoveredPoints}/${cond.target}pt)`;
+                    }
+                }
+
+                card.innerHTML = `
+                    <div class="w-14 h-14 ${isUnlocked && senbei.shape === 'square' ? 'rounded-xl' : 'rounded-full'} flex items-center justify-center shadow-inner relative overflow-hidden" 
+                         style="background: ${isUnlocked ? senbei.bgGrad : '#d6d3d1'}; border: 2px solid ${isUnlocked ? senbei.border : '#a8a29e'};">
+                        ${itemIcon}
+                    </div>
+                    <div class="w-full">
+                        <div class="font-bold text-[11px] text-stone-800 leading-tight">
+                            ${isUnlocked ? senbei.name : '？？？？'}
+                        </div>
+                        <div class="text-[9px] font-bold ${isUnlocked ? 'text-emerald-700' : 'text-stone-600'} mt-1 bg-stone-50 px-1 py-0.5 rounded border border-stone-200">
+                            ${isUnlocked ? '🔍 詳細を見る' : '🔒 ' + condText}
+                        </div>
+                    </div>
+                `;
+
+                if (isUnlocked) {
+                    card.addEventListener('click', () => {
+                        openDetailModal(index);
+                    });
+                }
+
+                collectionGrid.appendChild(card);
+            });
+        }
+
+        // 今日データ表示の設定
+        document.getElementById('currentDateStr').textContent = new Date().toLocaleDateString('ja-JP');
+
+        // 初期表示
+        updateDisplay();
+        applySenbeiVisual(SENBEI_TYPES[0]);
+    </script>
+</body>
+</html>
